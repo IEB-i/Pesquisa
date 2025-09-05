@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Pesquisa Horário do Culto</title>
+    <link rel="shortcut icon" href="/assets/fav.ico" type="image/x-icon" />
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: #8B4513;
+            --secondary-color: #A0522D;
+            --accent-color: #CD853F;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)) !important;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #fff, #f8f9fa);
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 20px 0;
+        }
+
+        .progress-custom {
+            height: 25px;
+            border-radius: 15px;
+            background-color: #e9ecef;
+        }
+
+        .progress-bar-custom {
+            border-radius: 15px;
+            background: linear-gradient(90deg, var(--success-color), #20c997);
+        }
+
+        .badge-custom {
+            font-size: 0.8rem;
+            padding: 8px 12px;
+            border-radius: 20px;
+        }
+
+        .loading-spinner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+        }
+
+        .refresh-btn {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            border: none;
+            border-radius: 25px;
+            padding: 10px 20px;
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .refresh-btn:hover {
+            background: linear-gradient(135deg, var(--secondary-color), var(--accent-color));
+            transform: scale(1.05);
+        }
+
+        .alert-custom {
+            border: none;
+            border-radius: 10px;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        @media (max-width: 768px) {
+            .stat-number {
+                font-size: 2rem;
+            }
+            
+            .chart-container {
+                height: 250px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="bi bi-bar-chart-fill me-2"></i>
+                Dashboard - Pesquisa Horário do Culto
+            </span>
+            <button class="btn refresh-btn" onclick="loadData()">
+                <i class="bi bi-arrow-clockwise me-1"></i>
+                Atualizar
+            </button>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <!-- Alert de Status -->
+        <div id="alertContainer"></div>
+
+        <!-- Cards de Estatísticas -->
+        <div class="row mb-4">
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card stat-card">
+                    <div class="card-body text-center">
+                        <div class="stat-number" id="totalRespostas">-</div>
+                        <div class="stat-label">Total de Respostas</div>
+                        <i class="bi bi-people-fill text-muted" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card stat-card">
+                    <div class="card-body text-center">
+                        <div class="stat-number text-success" id="satisfeitosCount">-</div>
+                        <div class="stat-label">Satisfeitos</div>
+                        <i class="bi bi-emoji-smile-fill text-success" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card stat-card">
+                    <div class="card-body text-center">
+                        <div class="stat-number text-danger" id="insatisfeitosCount">-</div>
+                        <div class="stat-label">Insatisfeitos</div>
+                        <i class="bi bi-emoji-frown-fill text-danger" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card stat-card">
+                    <div class="card-body text-center">
+                        <div class="stat-number" id="horarioPreferido">-</div>
+                        <div class="stat-label">Horário Mais Votado</div>
+                        <i class="bi bi-clock-fill text-muted" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráficos -->
+        <div class="row mb-4">
+            <!-- Gráfico de Satisfação -->
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-transparent">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-pie-chart-fill me-2"></i>
+                            Satisfação com Horário Atual
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="satisfacaoChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Gráfico de Preferência de Horário -->
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-transparent">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-bar-chart-fill me-2"></i>
+                            Preferência de Novo Horário
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="horarioChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detalhes e Progressos -->
+        <div class="row mb-4">
+            <div class="col-lg-8 mb-4">
+                <div class="card">
+                    <div class="card-header bg-transparent">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-list-ul me-2"></i>
+                            Detalhamento por Horário
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="horarioDetalhes">
+                            <div class="loading-spinner">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Carregando...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-4 mb-4">
+                <div class="card">
+                    <div class="card-header bg-transparent">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-info-circle-fill me-2"></i>
+                            Informações
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <small class="text-muted">Última atualização:</small>
+                            <div id="ultimaAtualizacao" class="fw-bold">-</div>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Taxa de Satisfação:</small>
+                            <div class="progress progress-custom mt-2">
+                                <div class="progress-bar progress-bar-custom" id="progressSatisfacao" role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <small id="percentualSatisfacao" class="text-muted">0%</small>
+                        </div>
+                        <div class="d-grid">
+                            <a href="index.html" class="btn btn-outline-primary">
+                                <i class="bi bi-arrow-left me-1"></i>
+                                Voltar à Pesquisa
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyC31C1X13eqVAOq_o5K2evI8q3GOfnpOpo",
+            authDomain: "iebi-2e84e.firebaseapp.com",
+            projectId: "iebi-2e84e",
+            storageBucket: "iebi-2e84e.firebasestorage.app",
+            messagingSenderId: "634456198202",
+            appId: "1:634456198202:web:8b4de1b4def23a49303903"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        let satisfacaoChart, horarioChart;
+
+        // Função para carregar dados
+        window.loadData = async function() {
+            try {
+                showAlert('Carregando dados...', 'info');
+                
+                const querySnapshot = await getDocs(collection(db, 'Eventos', 'pesqCultoDomingo', 'respostas'));
+                const dados = [];
+                
+                querySnapshot.forEach((doc) => {
+                    dados.push(doc.data());
+                });
+
+                if (dados.length === 0) {
+                    showAlert('Nenhuma resposta encontrada ainda.', 'warning');
+                    return;
+                }
+
+                processarDados(dados);
+                showAlert('Dados atualizados com sucesso!', 'success');
+                
+            } catch (error) {
+                console.error('Erro ao carregar dados:', error);
+                showAlert('Erro ao carregar dados. Tente novamente.', 'danger');
+            }
+        }
+
+        function processarDados(dados) {
+            // Estatísticas básicas
+            const total = dados.length;
+            const satisfeitos = dados.filter(d => d.satisfacao_horario_atual === 'sim').length;
+            const insatisfeitos = total - satisfeitos;
+            
+            // Contagem de preferências de horário
+            const horarios = {
+                '10:00': dados.filter(d => d.preferencia_novo_horario === '10:00').length,
+                '18:00': dados.filter(d => d.preferencia_novo_horario === '18:00').length,
+                '18:30': dados.filter(d => d.preferencia_novo_horario === '18:30').length
+            };
+            
+            const horarioMaisVotado = Object.keys(horarios).reduce((a, b) => horarios[a] > horarios[b] ? a : b);
+            const percentualSatisfacao = total > 0 ? Math.round((satisfeitos / total) * 100) : 0;
+
+            // Atualizar cards
+            document.getElementById('totalRespostas').textContent = total;
+            document.getElementById('satisfeitosCount').textContent = satisfeitos;
+            document.getElementById('insatisfeitosCount').textContent = insatisfeitos;
+            document.getElementById('horarioPreferido').textContent = horarioMaisVotado;
+            document.getElementById('ultimaAtualizacao').textContent = new Date().toLocaleString('pt-BR');
+            document.getElementById('percentualSatisfacao').textContent = percentualSatisfacao + '%';
+            document.getElementById('progressSatisfacao').style.width = percentualSatisfacao + '%';
+
+            // Atualizar gráficos
+            atualizarGraficoSatisfacao(satisfeitos, insatisfeitos);
+            atualizarGraficoHorario(horarios);
+            atualizarDetalhesHorario(horarios, total);
+        }
+
+        function atualizarGraficoSatisfacao(satisfeitos, insatisfeitos) {
+            const ctx = document.getElementById('satisfacaoChart').getContext('2d');
+            
+            if (satisfacaoChart) {
+                satisfacaoChart.destroy();
+            }
+            
+            satisfacaoChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Satisfeitos', 'Insatisfeitos'],
+                    datasets: [{
+                        data: [satisfeitos, insatisfeitos],
+                        backgroundColor: ['#28a745', '#dc3545'],
+                        borderWidth: 0,
+                        hoverOffset: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                usePointStyle: true
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function atualizarGraficoHorario(horarios) {
+            const ctx = document.getElementById('horarioChart').getContext('2d');
+            
+            if (horarioChart) {
+                horarioChart.destroy();
+            }
+            
+            horarioChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(horarios),
+                    datasets: [{
+                        label: 'Votos',
+                        data: Object.values(horarios),
+                        backgroundColor: ['#228B22', '#FF8C00', '#8B4513'],
+                        borderRadius: 8,
+                        borderSkipped: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function atualizarDetalhesHorario(horarios, total) {
+            const container = document.getElementById('horarioDetalhes');
+            let html = '';
+            
+            Object.entries(horarios).forEach(([horario, votos]) => {
+                const percentual = total > 0 ? Math.round((votos / total) * 100) : 0;
+                const corBarra = horario === '10:00' ? 'success' : horario === '18:00' ? 'warning' : 'primary';
+                
+                html += `
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-bold">${horario}</span>
+                            <span class="badge bg-${corBarra} badge-custom">${votos} votos (${percentual}%)</span>
+                        </div>
+                        <div class="progress progress-custom">
+                            <div class="progress-bar bg-${corBarra}" style="width: ${percentual}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function showAlert(message, type) {
+            const alertContainer = document.getElementById('alertContainer');
+            const alertId = 'alert-' + Date.now();
+            
+            const alertHtml = `
+                <div id="${alertId}" class="alert alert-${type} alert-custom alert-dismissible fade show" role="alert">
+                    <i class="bi bi-${getAlertIcon(type)} me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            
+            alertContainer.innerHTML = alertHtml;
+            
+            // Auto-dismiss após 5 segundos
+            setTimeout(() => {
+                const alert = document.getElementById(alertId);
+                if (alert) {
+                    const bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                }
+            }, 5000);
+        }
+
+        function getAlertIcon(type) {
+            const icons = {
+                'success': 'check-circle-fill',
+                'danger': 'exclamation-triangle-fill',
+                'warning': 'exclamation-triangle-fill',
+                'info': 'info-circle-fill'
+            };
+            return icons[type] || 'info-circle-fill';
+        }
+
+        // Carregar dados ao inicializar
+        document.addEventListener('DOMContentLoaded', loadData);
+        
+        // Auto-refresh a cada 30 segundos
+        setInterval(loadData, 30000);
+    </script>
+</body>
+</html>
